@@ -61,8 +61,8 @@ zshrc = Path(sys.argv[1])
 zsh_dir = sys.argv[2]
 tools_file = sys.argv[3]
 text = zshrc.read_text() if zshrc.exists() else ""
-managed = ["git", "zsh-autosuggestions", "zsh-syntax-highlighting"]
-disabled = {"zsh-autocomplete", "fast-syntax-highlighting"}
+managed = ["git", "zsh-autosuggestions"]
+disabled = {"zsh-autocomplete", "fast-syntax-highlighting", "zsh-syntax-highlighting"}
 match = re.search(r"(?m)^([ \t]*)plugins=\(([^)]*)\)", text)
 
 if match:
@@ -89,6 +89,14 @@ if omz_source:
     text = text[:omz_source.start()] + autocomplete_source + "\n" + text[omz_source.start():]
 else:
     text = text.rstrip() + "\n\n" + autocomplete_source + "\n"
+
+text = re.sub(
+    r"(?m)^[ \t]*(?:source|\.)[^\n]*(?:fast-syntax-highlighting\.plugin\.zsh|zsh-syntax-highlighting(?:\.plugin)?\.zsh)[^\n]*(?:\n|$)",
+    "",
+    text,
+)
+highlighting_source = 'source "${ZSH_CUSTOM:-${ZSH:-$HOME/.oh-my-zsh}/custom}/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.plugin.zsh"'
+text = text.rstrip() + "\n\n" + highlighting_source + "\n"
 
 zshrc.parent.mkdir(parents=True, exist_ok=True)
 zshrc.write_text(text)
@@ -126,20 +134,34 @@ EOF
 
 broot_target=""
 case "$(uname -m)" in
-    x86_64) broot_target="x86_64-unknown-linux-gnu" ;;
+    x86_64) broot_target="x86_64-unknown-linux-gnu.2.28" ;;
     aarch64|arm64) broot_target="aarch64-unknown-linux-gnu" ;;
 esac
 
 broot_local="$HOME_DIR/.local/bin/broot"
 mkdir -p "$(dirname "$broot_local")"
-if [[ ! -x "$broot_local" && -n "$broot_target" ]]; then
-    curl -fsSL "https://dystroy.org/broot/download/$broot_target/broot" -o "$broot_local"
-    chmod 0755 "$broot_local"
+if [[ -n "$broot_target" ]] && { [[ ! -x "$broot_local" ]] || ! "$broot_local" --version >/dev/null 2>&1; }; then
+    broot_tmp="$(mktemp "${broot_local}.XXXXXX")"
+    if curl -fsSL "https://dystroy.org/broot/download/$broot_target/broot" -o "$broot_tmp" &&
+        chmod 0755 "$broot_tmp" &&
+        "$broot_tmp" --version >/dev/null 2>&1; then
+        mv -f "$broot_tmp" "$broot_local"
+    else
+        rm -f "$broot_tmp"
+        printf 'Could not install a Broot binary compatible with this host.\n' >&2
+    fi
 fi
 
-broot_bin="$broot_local"
-if [[ ! -x "$broot_bin" ]]; then
-    broot_bin="$(command -v broot || true)"
+if [[ -x "$broot_local" ]] && "$broot_local" --version >/dev/null 2>&1; then
+    broot_bin="$broot_local"
+else
+    broot_candidate="$(command -v broot || true)"
+    if [[ -n "$broot_candidate" && "$broot_candidate" != "$broot_local" ]] &&
+        "$broot_candidate" --version >/dev/null 2>&1; then
+        broot_bin="$broot_candidate"
+    else
+        broot_bin=""
+    fi
 fi
 
 if [[ -n "$broot_bin" ]]; then
@@ -216,7 +238,7 @@ else:
 PY
     printf 'Broot configured: select a file and press Alt+O to open it in nano.\n'
 else
-    printf 'Broot was not installed: no prebuilt binary is available for this CPU architecture.\n' >&2
+    printf 'Broot is unavailable or incompatible with this host; br and Alt+O were not configured.\n' >&2
 fi
 
 printf 'Zsh setup complete. zsh-autocomplete is loaded before Oh My Zsh, with zsh-syntax-highlighting enabled.\n'
