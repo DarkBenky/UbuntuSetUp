@@ -7,6 +7,7 @@ ZSH_CUSTOM="${ZSH_CUSTOM:-$ZSH_DIR/custom}"
 ZDOTDIR="${ZDOTDIR:-$HOME_DIR}"
 ZSHRC="$ZDOTDIR/.zshrc"
 TOOLS_FILE="$HOME_DIR/.config/zsh/server-tools.zsh"
+BROOT_ZSH_FUNCTION="$HOME_DIR/.config/zsh/broot.zsh"
 
 run_as_root() {
     if [[ "$EUID" -eq 0 ]]; then
@@ -96,6 +97,10 @@ PY
 cat > "$TOOLS_FILE" <<'EOF'
 export PATH="$HOME/.local/bin:/usr/local/go/bin:$HOME/miniconda3/bin:$PATH"
 
+if [[ -r "$HOME/.config/zsh/broot.zsh" ]]; then
+    source "$HOME/.config/zsh/broot.zsh"
+fi
+
 todo() {
     find . \
         \( -name '*.go' -o -name '*.c' -o -name '*.h' -o -name '*.cpp' -o -name '*.py' -o -name '*.vue' \) \
@@ -138,6 +143,7 @@ if [[ ! -x "$broot_bin" ]]; then
 fi
 
 if [[ -n "$broot_bin" ]]; then
+    "$broot_bin" --print-shell-function zsh > "$BROOT_ZSH_FUNCTION"
     python3 - "${XDG_CONFIG_HOME:-$HOME_DIR/.config}/broot" <<'PY'
 from pathlib import Path
 import re
