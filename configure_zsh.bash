@@ -60,13 +60,13 @@ zshrc = Path(sys.argv[1])
 zsh_dir = sys.argv[2]
 tools_file = sys.argv[3]
 text = zshrc.read_text() if zshrc.exists() else ""
-managed = ["zsh-autocomplete", "git", "zsh-autosuggestions", "fast-syntax-highlighting"]
-disabled = {"zsh-syntax-highlighting"}
+managed = ["git", "zsh-autosuggestions", "zsh-syntax-highlighting"]
+disabled = {"zsh-autocomplete", "fast-syntax-highlighting"}
 match = re.search(r"(?m)^([ \t]*)plugins=\(([^)]*)\)", text)
 
 if match:
     current = [name for name in match.group(2).split() if name not in disabled and name not in managed]
-    plugins = ["zsh-autocomplete"] + current + [name for name in managed if name != "zsh-autocomplete"]
+    plugins = current + managed
     replacement = f"{match.group(1)}plugins=({' '.join(plugins)})"
     text = text[:match.start()] + replacement + text[match.end():]
 else:
@@ -80,6 +80,14 @@ else:
 tools_source = f'source "{tools_file}"'
 if tools_source not in text:
     text = text.rstrip() + f"\n\n{tools_source}\n"
+
+autocomplete_source = 'source "${ZSH_CUSTOM:-${ZSH:-$HOME/.oh-my-zsh}/custom}/plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh"'
+text = re.sub(r"(?m)^[ \t]*source [^\n]*zsh-autocomplete\.plugin\.zsh[^\n]*(?:\n|$)", "", text)
+omz_source = re.search(r"(?m)^[ \t]*(?:source|\.)[^\n]*oh-my-zsh\.sh[^\n]*$", text)
+if omz_source:
+    text = text[:omz_source.start()] + autocomplete_source + "\n" + text[omz_source.start():]
+else:
+    text = text.rstrip() + "\n\n" + autocomplete_source + "\n"
 
 zshrc.parent.mkdir(parents=True, exist_ok=True)
 zshrc.write_text(text)
@@ -205,6 +213,6 @@ else
     printf 'Broot was not installed: no prebuilt binary is available for this CPU architecture.\n' >&2
 fi
 
-printf 'Zsh setup complete. zsh-autocomplete and fast-syntax-highlighting are enabled under Oh My Zsh.\n'
+printf 'Zsh setup complete. zsh-autocomplete is loaded before Oh My Zsh, with zsh-syntax-highlighting enabled.\n'
 printf 'Start the configured shell now with: exec zsh\n'
 printf 'To make Zsh the login shell, run: chsh -s %s\n' "$(command -v zsh)"
