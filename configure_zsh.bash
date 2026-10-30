@@ -130,6 +130,49 @@ big() {
         | head -n 10 \
         | awk -F '\t' '{printf "%.2f MB\t%s\n", $1 / 1048576, substr($0, index($0, "\t") + 1)}'
 }
+
+free() {
+    setopt localoptions pipefail
+    local -a df_paths=(-- .)
+
+    if (( $# > 1 )); then
+        printf 'Usage: free [-a|all|-all|--all]\n' >&2
+        return 2
+    fi
+
+    case "${1:-}" in
+        '') ;;
+        -a|all|-all|--all) df_paths=() ;;
+        -h|--help)
+            printf 'Usage: free [-a|all|-all|--all]\n'
+            return 0
+            ;;
+        *)
+            printf 'Usage: free [-a|all|-all|--all]\n' >&2
+            return 2
+            ;;
+    esac
+
+    df -k --output=avail,size,pcent,target "${df_paths[@]}" \
+        | awk '
+            NR == 1 {
+                printf "%-28s %19s  %5s  %s\n", "MOUNT", "FREE / TOTAL", "USED", "USAGE"
+                next
+            }
+            {
+                mount = $0
+                sub(/^[[:space:]]*[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+[^[:space:]]+[[:space:]]+/, "", mount)
+                space = sprintf("%.1fG / %.1fG", $1 / 1048576, $2 / 1048576)
+                filled = int(($3 + 0) / 5)
+                if (filled < 0) filled = 0
+                if (filled > 20) filled = 20
+                bar = ""
+                for (segment = 0; segment < 20; segment++)
+                    bar = bar (segment < filled ? "#" : "-")
+                printf "%-28s %19s  %5s  [%s]\n", mount, space, $3, bar
+            }
+        '
+}
 EOF
 
 broot_target=""
